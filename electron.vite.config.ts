@@ -126,24 +126,15 @@ export default defineConfig({
         build: {
             target: CHROME,
             sourcemap: true,
+            minify: "esbuild",
             outDir: "dist/frontend",
+            // The renderer is loaded from disk, so bundle size costs no download time. The largest chunks are
+            // Monaco and its language workers (ts.worker is 7.0 MB), which cannot be split below 500 kB; the
+            // limit is set just above that so a chunk growing past it is still reported.
+            chunkSizeWarningLimit: 7100,
             rollupOptions: {
                 input: {
                     index: "index.html",
-                },
-                output: {
-                    manualChunks(id) {
-                        const p = id.replace(/\\/g, "/");
-                        if (p.includes("node_modules/monaco") || p.includes("node_modules/@monaco")) return "monaco";
-                        if (p.includes("node_modules/mermaid") || p.includes("node_modules/@mermaid")) return "mermaid";
-                        if (p.includes("node_modules/katex") || p.includes("node_modules/@katex")) return "katex";
-                        if (p.includes("node_modules/shiki") || p.includes("node_modules/@shiki")) {
-                            return "shiki";
-                        }
-                        if (p.includes("node_modules/cytoscape") || p.includes("node_modules/@cytoscape"))
-                            return "cytoscape";
-                        return undefined;
-                    },
                 },
             },
         },

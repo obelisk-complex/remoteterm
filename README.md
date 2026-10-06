@@ -72,6 +72,15 @@ The WSH helper runs on the following platforms:
 - Windows 10 or later (x64)
 - Linux Kernel 2.6.32 or later (x64), Linux Kernel 3.1 or later (arm64)
 
+### Upgrading from Wave Terminal
+
+RemoteTerm is a fork of Wave Terminal. If you have any `WAVETERM_*_HOME` environment variables
+set in your shell profile from a previous Wave Terminal install, they're still honoured (as
+deprecated aliases for the equivalent `REMOTETERM_*_HOME` vars) — your config and data locations
+carry over unchanged. These vars only affect where RemoteTerm's own config/data files live; they
+do not relocate the app's browser profile (cookies, web-block logins, etc.), which stays at its
+normal OS-default location for a regular install either way.
+
 ## Building from Source
 
 See [Building RemoteTerm](BUILD.md).

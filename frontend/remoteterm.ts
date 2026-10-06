@@ -75,12 +75,12 @@ async function initBare() {
         window.dispatchEvent(new CustomEvent("remoteterm-resize"));
     });
     setKeyUtilPlatform(platform);
-    loadFonts();
+    const fontsReady = loadFonts();
     updateZoomFactor(getApi().getZoomFactor());
     getApi().onZoomFactorChange((zoomFactor) => {
         updateZoomFactor(zoomFactor);
     });
-    document.fonts.ready.then(() => {
+    fontsReady.then(() => {
         console.log("Init Bare Done");
         getApi().setWindowInitStatus("ready");
     });

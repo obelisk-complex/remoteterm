@@ -98,6 +98,49 @@ describe("emain.ts startup order", () => {
         expect(guardIdx).toBeLessThan(srvIdx);
     });
 
+    // A subscription issued before the WS opens queues ahead of GetFullConfig, and the WS queue
+    // drains one message per 100 ms. The first menu build must still follow the subscription, so
+    // the initial workspace state is never missed.
+    it("subscribes to menu events after GetFullConfig and before the first menu build", () => {
+        const stmts = appMainStatements();
+        const isRpcCall = (n: ts.Node, method: string) =>
+            ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression) && n.expression.name.text === method;
+        const configIdx = stmts.findIndex((s) => containsNode(s, (n) => isRpcCall(n, "GetFullConfigCommand")));
+        const subIdx = stmts.findIndex((s) => containsNode(s, (n) => isCallTo(n, "initMenuEventSubscriptions")));
+        const menuIdx = stmts.findIndex((s) => containsNode(s, (n) => isCallTo(n, "makeAndSetAppMenu")));
+        expect(configIdx, "no GetFullConfigCommand call in appMain").toBeGreaterThanOrEqual(0);
+        expect(subIdx, "no initMenuEventSubscriptions() call in appMain").toBeGreaterThanOrEqual(0);
+        expect(menuIdx, "no makeAndSetAppMenu() call in appMain").toBeGreaterThanOrEqual(0);
+        expect(subIdx).toBeGreaterThan(configIdx);
+        expect(subIdx).toBeLessThan(menuIdx);
+    });
+
+    // The server listeners are bound before WAVESRV-ESTART is printed and the WS client queues
+    // until open, so a fixed delay buys nothing.
+    it("does not wait on a fixed sleep() between server readiness and the first config request", () => {
+        const stmts = appMainStatements();
+        expect(stmts.some((s) => containsNode(s, (n) => isCallTo(n, "sleep")))).toBe(false);
+    });
+
+    it("hands the startup config to relaunchBrowserWindows instead of fetching it again", () => {
+        const stmts = appMainStatements();
+        const relaunch = stmts
+            .map((s) => {
+                let found: ts.CallExpression | undefined;
+                containsNode(s, (n) => {
+                    if (isCallTo(n, "relaunchBrowserWindows")) {
+                        found = n as ts.CallExpression;
+                        return true;
+                    }
+                    return false;
+                });
+                return found;
+            })
+            .find((c) => c != null);
+        expect(relaunch, "no relaunchBrowserWindows() call in appMain").toBeDefined();
+        expect(relaunch.arguments.map((a) => a.getText())).toEqual(["fullConfig"]);
+    });
+
     it.each([["resolveLegacyInstanceBlock"], ["resolveIncompleteMigrationBlock"]])(
         "imports %s from emain-platform",
         (name) => {

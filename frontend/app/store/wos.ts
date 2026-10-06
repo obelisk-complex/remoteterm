@@ -120,7 +120,7 @@ function callBackendService(service: string, method: string, args: any[], noUICo
     const url = webEndpoint + "/wave/service?" + usp.toString();
     const fetchPromise = fetch(url, {
         method: "POST",
-        body: JSON.stringify(waveCall),
+        body: new Blob([JSON.stringify(waveCall)]),
     });
     const prtn = fetchPromise
         .then((resp) => {

@@ -7,6 +7,7 @@ import {
     errorForMetric,
     getGpuColor,
     metricMetaToTimeSeriesMeta,
+    plotMemoKey,
     SysinfoViewModel,
 } from "@/app/view/sysinfo/sysinfo";
 import * as jotai from "jotai";
@@ -124,6 +125,81 @@ describe("metricMetaToTimeSeriesMeta", () => {
             decimalplaces: 0,
         });
         expect(meta.color).toBe(getGpuColor(1));
+    });
+});
+
+describe("plotMemoKey", () => {
+    const cpuMeta: TimeSeriesMeta = {
+        name: "CPU %",
+        label: "%",
+        color: "var(--sysinfo-cpu-color)",
+        miny: 0,
+        maxy: 100,
+        decimalPlaces: 0,
+    };
+
+    // 120 s across 300 px = 400 ms of axis travel per pixel.
+    it("stays equal while the value is unchanged and the axis has moved less than a pixel", () => {
+        const a = plotMemoKey([{ ts: 800, cpu: 42 }], "cpu", cpuMeta, "#000", 300, 150, 120);
+        const b = plotMemoKey([{ ts: 800 }, { ts: 1100, cpu: 42 }], "cpu", cpuMeta, "#000", 300, 150, 120);
+        expect(b).toEqual(a);
+    });
+
+    it("changes when the axis advances a pixel or more even though the value is constant", () => {
+        const a = plotMemoKey([{ ts: 1000, cpu: 0 }], "cpu", cpuMeta, "#000", 300, 150, 120);
+        const b = plotMemoKey([{ ts: 1000, cpu: 0 }, { ts: 2000, cpu: 0 }], "cpu", cpuMeta, "#000", 300, 150, 120);
+        expect(b).not.toEqual(a);
+    });
+
+    it("scales the skip window with the time span per pixel", () => {
+        const a = plotMemoKey([{ ts: 0, cpu: 5 }], "cpu", cpuMeta, "#000", 300, 150, 3600);
+        const b = plotMemoKey([{ ts: 0 }, { ts: 11000, cpu: 5 }], "cpu", cpuMeta, "#000", 300, 150, 3600);
+        const c = plotMemoKey([{ ts: 0 }, { ts: 12000, cpu: 5 }], "cpu", cpuMeta, "#000", 300, 150, 3600);
+        expect(b).toEqual(a);
+        expect(c).not.toEqual(a);
+    });
+
+    it("changes when the metric's display name changes", () => {
+        const a = plotMemoKey([{ ts: 1000, cpu: 42 }], "cpu", cpuMeta, "#000", 300, 150, 120);
+        const renamed = { ...cpuMeta, name: "CPU (all)" };
+        expect(plotMemoKey([{ ts: 1000, cpu: 42 }], "cpu", renamed, "#000", 300, 150, 120)).not.toEqual(a);
+    });
+
+    it("keys on the raw timestamp when the plot has no width yet", () => {
+        const a = plotMemoKey([{ ts: 1000, cpu: 42 }], "cpu", cpuMeta, "#000", 0, 0, 120);
+        const b = plotMemoKey([{ ts: 1001, cpu: 42 }], "cpu", cpuMeta, "#000", 0, 0, 120);
+        expect(b).not.toEqual(a);
+    });
+
+    it("changes when this metric's own latest value changes", () => {
+        const a = plotMemoKey([{ ts: 1000, cpu: 42 }], "cpu", cpuMeta, "#000", 300, 150, 120);
+        const b = plotMemoKey([{ ts: 2000, cpu: 43 }], "cpu", cpuMeta, "#000", 300, 150, 120);
+        expect(b).not.toEqual(a);
+    });
+
+    it("changes when width or height changes", () => {
+        const a = plotMemoKey([{ ts: 1000, cpu: 42 }], "cpu", cpuMeta, "#000", 300, 150, 120);
+        expect(plotMemoKey([{ ts: 1000, cpu: 42 }], "cpu", cpuMeta, "#000", 301, 150, 120)).not.toEqual(a);
+        expect(plotMemoKey([{ ts: 1000, cpu: 42 }], "cpu", cpuMeta, "#000", 300, 151, 120)).not.toEqual(a);
+    });
+
+    it("treats two NaN latest values (gap markers) as an unchanged key, not a fresh diff each tick", () => {
+        const a = plotMemoKey([{ ts: 800, cpu: NaN }], "cpu", cpuMeta, "#000", 300, 150, 120);
+        const b = plotMemoKey([{ ts: 1100, cpu: NaN }], "cpu", cpuMeta, "#000", 300, 150, 120);
+        expect(b).toEqual(a);
+    });
+
+    it("changes when yvalMeta's color/label/decimalPlaces/domain bounds change", () => {
+        const a = plotMemoKey([{ ts: 1000, cpu: 42 }], "cpu", cpuMeta, "#000", 300, 150, 120);
+        const recolored = { ...cpuMeta, color: "#fff" };
+        expect(plotMemoKey([{ ts: 1000, cpu: 42 }], "cpu", recolored, "#000", 300, 150, 120)).not.toEqual(a);
+    });
+
+    it("falls back to the default color when yvalMeta has none, and that still participates in the key", () => {
+        const noColorMeta = { ...cpuMeta, color: undefined };
+        const a = plotMemoKey([{ ts: 1000, cpu: 42 }], "cpu", noColorMeta, "#000", 300, 150, 120);
+        const b = plotMemoKey([{ ts: 1000, cpu: 42 }], "cpu", noColorMeta, "#fff", 300, 150, 120);
+        expect(b).not.toEqual(a);
     });
 });
 

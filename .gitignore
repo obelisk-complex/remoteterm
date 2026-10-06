@@ -44,8 +44,8 @@ docsite/
 .superpowers
 docs/superpowers
 .claude
-golang-*/
-zig-*/
+golang-*
+zig-*
 .pi/delegate-results/
 
 # Local tooling / accidental artifacts (never commit)

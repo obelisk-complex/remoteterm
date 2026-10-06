@@ -2,18 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { MessageModal } from "@/app/modals/messagemodal";
-import { NewInstallOnboardingModal } from "@/app/onboarding/onboarding";
-import { UpgradeOnboardingModal } from "@/app/onboarding/onboarding-upgrade";
-import { UpgradeOnboardingPatch } from "@/app/onboarding/onboarding-upgrade-patch";
 import { DeleteFileModal, PublishAppModal, RenameFileModal } from "@/builder/builder-apppanel";
 import { SetSecretDialog } from "@/builder/tabs/builder-secrettab";
+import { lazy } from "react";
 import { AboutModal } from "./about";
 import { UserInputPrompt } from "./userinputprompt";
 
+// The onboarding screens run once per install or release but pull in the markdown, syntax
+// highlighting and editor libraries, so they load on first use. Render them inside their own <Suspense>.
+export const NewInstallOnboardingModal = lazy(() =>
+    import("@/app/onboarding/onboarding").then((m) => ({ default: m.NewInstallOnboardingModal }))
+);
+export const UpgradeOnboardingModal = lazy(() =>
+    import("@/app/onboarding/onboarding-upgrade").then((m) => ({ default: m.UpgradeOnboardingModal }))
+);
+const UpgradeOnboardingPatch = lazy(() =>
+    import("@/app/onboarding/onboarding-upgrade-patch").then((m) => ({ default: m.UpgradeOnboardingPatch }))
+);
+
 const modalRegistry: { [key: string]: React.ComponentType<any> } = {
-    [NewInstallOnboardingModal.displayName || "NewInstallOnboardingModal"]: NewInstallOnboardingModal,
-    [UpgradeOnboardingModal.displayName || "UpgradeOnboardingModal"]: UpgradeOnboardingModal,
-    [UpgradeOnboardingPatch.displayName || "UpgradeOnboardingPatch"]: UpgradeOnboardingPatch,
+    NewInstallOnboardingModal,
+    UpgradeOnboardingModal,
+    UpgradeOnboardingPatch,
     [UserInputPrompt.displayName || "UserInputPrompt"]: UserInputPrompt,
     [AboutModal.displayName || "AboutModal"]: AboutModal,
     [MessageModal.displayName || "MessageModal"]: MessageModal,

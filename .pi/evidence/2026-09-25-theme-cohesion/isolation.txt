@@ -1,0 +1,2 @@
+DISPLAY=:99
+XDG_CONFIG_HOME=/tmp/claude-1000/theme-cohesion-xvfb/config

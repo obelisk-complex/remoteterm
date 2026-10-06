@@ -899,7 +899,7 @@ export async function createNewRemoteTermWindow() {
     newBrowserWindow.show();
 }
 
-export async function relaunchBrowserWindows() {
+export async function relaunchBrowserWindows(startupConfig?: FullConfigType) {
     console.log("relaunchBrowserWindows");
     setGlobalIsRelaunching(true);
     const windows = getAllRemoteTermWindows();
@@ -913,7 +913,7 @@ export async function relaunchBrowserWindows() {
     setGlobalIsRelaunching(false);
 
     const clientData = await ClientService.GetClientData();
-    const fullConfig = await RpcApi.GetFullConfigCommand(ElectronWshClient);
+    const fullConfig = startupConfig ?? (await RpcApi.GetFullConfigCommand(ElectronWshClient));
     const windowIds = clientData.windowids ?? [];
     const wins: RemoteTermBrowserWindow[] = [];
     const isFirstRelaunch = !hasCompletedFirstRelaunch;
@@ -1034,6 +1034,26 @@ function waitForFullscreenEnter(window: RemoteTermBrowserWindow): Promise<void> 
     });
 }
 
+async function showQuakeWindow(window: RemoteTermBrowserWindow) {
+    const targetDisplay = getDisplayForQuakeToggle();
+    moveWindowToDisplay(window, targetDisplay);
+    window.show();
+    if (quakeRestoreFullscreenOnShow) {
+        const enterPromise = waitForFullscreenEnter(window);
+        window.setFullScreen(true);
+        try {
+            await enterPromise;
+        } catch {
+            // timeout: proceed anyway
+        }
+    }
+    quakeRestoreFullscreenOnShow = false;
+    window.focus();
+    if (window.activeTabView?.webContents) {
+        window.activeTabView.webContents.focus();
+    }
+}
+
 async function quakeToggle() {
     if (quakeToggleInProgress) {
         return;
@@ -1067,23 +1087,7 @@ async function quakeToggle() {
         if (window.isVisible()) {
             window.hide();
         } else {
-            const targetDisplay = getDisplayForQuakeToggle();
-            moveWindowToDisplay(window, targetDisplay);
-            window.show();
-            if (quakeRestoreFullscreenOnShow) {
-                const enterPromise = waitForFullscreenEnter(window);
-                window.setFullScreen(true);
-                try {
-                    await enterPromise;
-                } catch {
-                    // timeout — proceed anyway
-                }
-            }
-            quakeRestoreFullscreenOnShow = false;
-            window.focus();
-            if (window.activeTabView?.webContents) {
-                window.activeTabView.webContents.focus();
-            }
+            await showQuakeWindow(window);
         }
     } finally {
         quakeToggleInProgress = false;

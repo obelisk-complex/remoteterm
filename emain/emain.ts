@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { RpcApi } from "@/app/store/wshclientapi";
-import { setElectronNet } from "../frontend/util/fetchutil";
 import * as electron from "electron";
 import { focusedBuilderWindow, getAllBuilderWindows } from "emain/emain-builder";
 import { globalEvents } from "emain/emain-events";
 import { sprintf } from "sprintf-js";
 import * as services from "../frontend/app/store/services";
 import { initElectronWshrpc, shutdownWshrpc } from "../frontend/app/store/wshrpcutil-base";
-import { fireAndForget, sleep } from "../frontend/util/util";
+import { setElectronNet } from "../frontend/util/fetchutil";
+import { fireAndForget } from "../frontend/util/util";
 import { AuthKey, configureAuthKeyRequestInjection } from "./authkey";
 import {
     getActivityState,
@@ -27,6 +27,7 @@ import { initIpcHandlers } from "./emain-ipc";
 import { registerNativeThemeListener } from "./emain-native-theme";
 import { log } from "./emain-log";
 import { initMenuEventSubscriptions, makeAndSetAppMenu, makeDockTaskbar } from "./emain-menu";
+import { formatRssSampleLine, summarizeProcessMetrics } from "./emain-rss-monitor";
 import {
     checkIfRunningUnderARM64Translation,
     getElectronAppBasePath,
@@ -130,6 +131,21 @@ function handleWSEvent(evtMsg: WSEventType) {
 
 // this isn't perfect, but gets the job done without being complicated
 function runActiveTimer() {    setTimeout(runActiveTimer, 60000);
+}
+
+const RssSampleIntervalMs = 5 * 60 * 1000;
+
+// Trend data for chasing renderer-death/OOM reports (see [render-process-gone] logging in
+// emain-tab-lifecycle.ts) — a single manual `ps` snapshot can't distinguish "always been this
+// high" from "grew over hours", this can.
+function sampleRss() {
+    const samples = summarizeProcessMetrics(electronApp.getAppMetrics());
+    console.log(formatRssSampleLine(samples, Date.now()));
+}
+
+function startRssMonitor() {
+    sampleRss();
+    setInterval(sampleRss, RssSampleIntervalMs);
 }
 
 function hideWindowWithCatch(window: RemoteTermBrowserWindow) {
@@ -339,22 +355,28 @@ async function appMain() {
     configureAuthKeyRequestInjection(electron.session.defaultSession);
     initIpcHandlers();
 
-    await sleep(10); // wait a bit for remotetermsrv to be ready
     try {
         initElectronWshClient();
         initElectronWshrpc(ElectronWshClient, { authKey: AuthKey });
-        initMenuEventSubscriptions();
     } catch (e) {
         console.log("error initializing wshrpc", e);
     }
     const fullConfig = await RpcApi.GetFullConfigCommand(ElectronWshClient);
+    // After GetFullConfig, not before: a subscription made before the socket opens queues ahead of
+    // it and the WS queue drains one message per 100 ms. The menu is first built below, after this.
+    try {
+        initMenuEventSubscriptions();
+    } catch (e) {
+        console.log("error initializing menu event subscriptions", e);
+    }
     checkIfRunningUnderARM64Translation(fullConfig);
     if (fullConfig?.settings?.["app:confirmquit"] != null) {
         confirmQuit = fullConfig.settings["app:confirmquit"];
     }
     ensureHotSpareTab(fullConfig);
-    await relaunchBrowserWindows();
+    await relaunchBrowserWindows(fullConfig);
     setTimeout(runActiveTimer, 5000); // start active timer, wait 5s just to be safe
+    startRssMonitor();
     makeAndSetAppMenu();
     makeDockTaskbar();
 

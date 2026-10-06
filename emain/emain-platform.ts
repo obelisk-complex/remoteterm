@@ -791,8 +791,11 @@ function isRemoteTermIsolatedProfileActive(): boolean {
 /**
  * Where Electron's own runtime profile (cookies, cache, IndexedDB, GPU cache, session storage,
  * and the SingletonLock the single-instance lock is keyed on) goes for an ISOLATED launch only.
- * Electron's own default userData path (keyed off app.getName(), not app.setName("remoteterm/
- * electron") — that call nests under a name nothing else reads) ignores REMOTETERM_CONFIG_HOME/
+ * Electron's own default userData path (keyed off app.getName(), i.e. the later app.setName(isDev
+ * ? "RemoteTerm (Dev)" : "RemoteTerm") call, not the earlier app.setName("remoteterm/electron")
+ * — that first name is unrelated to userData path resolution, but performDataDirMigration() DOES
+ * separately read the same "remoteterm/electron" string, via the ElectronUserDataPath constant, to
+ * locate Electron's userData dir for migration) ignores REMOTETERM_CONFIG_HOME/
  * REMOTETERM_DATA_HOME/REMOTETERM_HOME entirely: two isolated launches with different overrides
  * still resolved to the SAME userData dir and so the SAME lock, meaning a scratch dev/test
  * instance's second-instance event fired against an unrelated already-running instance instead of
